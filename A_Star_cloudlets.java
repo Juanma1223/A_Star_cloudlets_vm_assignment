@@ -39,7 +39,7 @@ public class A_Star_cloudlets {
     static ArrayList<Vm> vms = new ArrayList<Vm>();
     static ArrayList<Cloudlet> cloudlets = new ArrayList<Cloudlet>();
     static float maxExecTime = 0;
-
+    
     public static void main(String[] args) {
         generateVms();
         generateCloudlets();
