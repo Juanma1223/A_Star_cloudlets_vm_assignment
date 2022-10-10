@@ -3,11 +3,14 @@ package org.cloudbus.cloudsim.brokers;
 import org.cloudbus.cloudsim.cloudlets.Cloudlet;
 import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.datacenters.Datacenter;
+import org.cloudbus.cloudsim.resources.Pe;
 import org.cloudbus.cloudsim.vms.Vm;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Random;
+import java.util.concurrent.Flow.Processor;
 
 public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
 
@@ -23,10 +26,8 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
     private int lastSelectedDcIndex;
 
     // Mocked vm and cloudlet lists
-    private ArrayList<MockVm> vms = new ArrayList<MockVm>();
-    private ArrayList<MockCloudlet> cloudlets = new ArrayList<MockCloudlet>();
-    // 
-    private float maxExecTime = 0;
+    private ArrayList<MockVm> mockVms = new ArrayList<MockVm>();
+    private ArrayList<MockCloudlet> mockCloudlets = new ArrayList<MockCloudlet>();
 
     /**
      * Creates a new DatacenterBroker.
@@ -48,10 +49,10 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
     public DataCenterBrokerAStar(final CloudSim simulation, final String name) {
         super(simulation, name);
         // Map cloudlets and vms to mock classes for an easier manipulation
-        this.mapCloudlets(this.getCloudletSubmittedList());
-        this.mapVms(this.getVmWaitingList());
-        // Bind sorted cloudlets with their corresponding real vm
-        this.bindVms(this.cloudlets)
+        this.mockCloudlets =  this.mapCloudlets(this.getCloudletSubmittedList());
+        this.mockVms = this.mapVms(this.getVmWaitingList());
+        // Execute A* Algorithm to assign cloudlets to vms
+        this.sortCloudlets();
         this.lastSelectedVmIndex = -1;
         this.lastSelectedDcIndex = -1;
     }
@@ -100,6 +101,28 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
         return getDatacenterList().get(++lastSelectedDcIndex);
     }
 
+    // Map real cloudlets to mock cloudlets
+    ArrayList<MockCloudlet> mapCloudlets(List<Cloudlet> cloudlets){
+        ArrayList<MockCloudlet> mockCloudlets = new ArrayList<MockCloudlet>();
+        for(int i=0;i<cloudlets.size();i++){
+            MockCloudlet mockCloudlet = new MockCloudlet(cloudlets.get(i).getTotalLength());
+            mockCloudlets.add(mockCloudlet);
+        }
+        return mockCloudlets;
+    } 
+
+    // Map real Vms to mock vms
+    ArrayList<MockVm> mapVms(List<Vm> vms){
+        ArrayList<MockVm> mockVms = new ArrayList<MockVm>();
+        for(int i=0;i<vms.size();i++){
+            double vmProcessorMips = vms.get(i).getProcessor().getMips();
+            long vmPes = vms.get(i).getProcessor().getCapacity();
+            MockVm mockVm = new MockVm((int)vmPes, (float)vmProcessorMips);
+            mockVms.add(mockVm);
+        }
+        return mockVms;
+    } 
+
     /**
      * {@inheritDoc}
      *
@@ -130,14 +153,13 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
     }
 
     private void sortCloudlets() {
-        for (int i = 0; i < cloudlets.size(); i++) {
-            int bestVm = minimumExecVm(cloudlets.get(i));
-            vms.get(bestVm).addCloudlet(cloudlets.get(i));
-        }
-        // Print result
-        for (int i = 0; i < vms.size(); i++) {
-            System.out.println("Cloudlets vm" + i);
-            vms.get(i).printCloudlets();
+        for (int i = 0; i < mockCloudlets.size(); i++) {
+            int bestVm = minimumExecVm(mockCloudlets.get(i));
+            // Keep track of cloudlets on mock vms
+            mockVms.get(bestVm).addCloudlet(mockCloudlets.get(i));
+            // Assign cloudlet to best vm
+            Vm assignedVm = this.getVmWaitingList().get(bestVm);
+            this.getCloudletSubmittedList().get(i).setVm(assignedVm);
         }
     }
 
@@ -148,10 +170,10 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
     private int minimumExecVm(MockCloudlet cloudlet) {
         int minVmIndex = 0;
         double currMin = Double.POSITIVE_INFINITY;
-        for (int i = 0; i < vms.size(); i++) {
+        for (int i = 0; i < mockVms.size(); i++) {
             // Calculate cloudlet's execution time on this vm
-            float vmExecTime = cloudlet.mips / vms.get(i).getExecPower();
-            float execTime = vmExecTime + vms.get(i).currentExecTime;
+            float vmExecTime = cloudlet.mips / mockVms.get(i).getExecPower();
+            float execTime = vmExecTime + mockVms.get(i).currentExecTime;
             if (execTime < currMin) {
                 minVmIndex = i;
                 currMin = execTime;
@@ -166,6 +188,10 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
         public int pid;
         public float mips;
 
+        public MockCloudlet(float mips){
+            this.mips = mips;
+        }
+
         public float getMips() {
             return mips;
         }
@@ -178,6 +204,11 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
         public int pes = 1;
         public float pesmips = 1000;
 
+        public MockVm(int pes, float pesmips){
+            this.pes = pes;
+            this.pesmips = pesmips;
+        }
+
         public void addCloudlet(MockCloudlet cloudlet) {
             this.cloudlets.add(cloudlet);
             this.currentExecTime = this.currentExecTime + (cloudlet.mips / getExecPower());
@@ -185,12 +216,6 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
 
         public float getExecPower() {
             return pes * pesmips;
-        }
-
-        public void printCloudlets() {
-            for (int i = 0; i < cloudlets.size(); i++) {
-                System.out.println(cloudlets.get(i).mips);
-            }
         }
     }
 }
