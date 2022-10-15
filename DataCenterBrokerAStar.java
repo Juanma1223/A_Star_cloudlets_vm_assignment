@@ -51,6 +51,8 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
         // Map cloudlets and vms to mock classes for an easier manipulation
         this.mockCloudlets =  this.mapCloudlets(this.getCloudletSubmittedList());
         this.mockVms = this.mapVms(this.getVmWaitingList());
+        Collections.sort(mockCloudlets, Comparator.comparing(MockCloudlet::getMips));
+        Collections.reverse(mockCloudlets);
         // Execute A* Algorithm to assign cloudlets to vms
         this.sortCloudlets();
         this.lastSelectedVmIndex = -1;
