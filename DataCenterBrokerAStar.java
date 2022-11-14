@@ -1,5 +1,4 @@
 package org.cloudbus.cloudsim.brokers;
-
 import org.cloudbus.cloudsim.cloudlets.Cloudlet;
 import org.cloudbus.cloudsim.core.CloudSim;
 import org.cloudbus.cloudsim.datacenters.Datacenter;
@@ -48,6 +47,12 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
      */
     public DataCenterBrokerAStar(final CloudSim simulation, final String name) {
         super(simulation, name);
+        
+        this.lastSelectedVmIndex = -1;
+        this.lastSelectedDcIndex = -1;
+    }
+
+    public void sortSubmittedCloudlets() {
         // Map cloudlets and vms to mock classes for an easier manipulation
         this.mockCloudlets =  this.mapCloudlets(this.getCloudletSubmittedList());
         this.mockVms = this.mapVms(this.getVmWaitingList());
@@ -55,8 +60,6 @@ public class DataCenterBrokerAStar extends DatacenterBrokerAbstract {
         Collections.reverse(mockCloudlets);
         // Execute A* Algorithm to assign cloudlets to vms
         this.sortCloudlets();
-        this.lastSelectedVmIndex = -1;
-        this.lastSelectedDcIndex = -1;
     }
 
     /**
